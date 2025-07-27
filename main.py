@@ -7,12 +7,11 @@ import requests
 from dotenv import load_dotenv
 load_dotenv()
 
-# ---- پارامترها را از محیط بگیر (secret!) ----
+# ---- پارامترها را از محیط بگیر ----
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DATABASE_PATH = os.getenv("DATABASE_PATH")
 ADMIN_CHAT_IDS = os.getenv("ADMIN_CHAT_IDS")
 
-# لیست تکی یا چندتایی آی‌دی ادمین (مثلاً 12345 یا 12345,67890)
 if ADMIN_CHAT_IDS:
     ADMIN_CHAT_IDS = [int(i.strip()) for i in ADMIN_CHAT_IDS.split(",") if i.strip()]
 else:
@@ -42,7 +41,6 @@ def send_document(chat_id, file_path, caption=""):
 def create_fuel_backup():
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
-    # نام جدول و ستون‌ها رو با دیتابیس خودت ست کن
     cursor.execute('SELECT date, km, liters, note FROM fuel_logs')
     rows = cursor.fetchall()
     headers = [desc[0] for desc in cursor.description]
@@ -57,27 +55,33 @@ def create_fuel_backup():
 @app.route('/webhook', methods=['POST'])
 def webhook():
     data = request.get_json()
+    print("📥 دریافت شد:", data)  # لاگ برای بررسی پیام‌ها
+
     if "message" not in data:
-        return "ok"
+        return "ok", 200
+
     chat_id = data["message"]["chat"]["id"]
     text = data["message"].get("text", "")
-    # فقط ادمین‌ها دسترسی به بکاپ دارند (یا خط بعدی رو کامنت کن برای دسترسی آزاد)
+
     if text == "📦 بکاپ سوختگیری":
         if ADMIN_CHAT_IDS and chat_id not in ADMIN_CHAT_IDS:
             send_message(chat_id, "دسترسی ندارید!", MAIN_MENU)
-            return "ok"
+            return "ok", 200
         try:
             file_path = create_fuel_backup()
             send_document(chat_id, file_path, caption="📦 بکاپ سوختگیری (CSV)")
             os.remove(file_path)
         except Exception as e:
             send_message(chat_id, f"❌ خطا در تهیه بکاپ: {e}")
-        return "ok"
+        return "ok", 200
+
     if text == "/start":
         send_message(chat_id, "به بات خوش آمدی! ⛽️", MAIN_MENU)
-        return "ok"
-    # سایر دکمه‌ها و فرمان‌ها
-    return "ok"
+        return "ok", 200
+
+    # سایر پیام‌ها
+    send_message(chat_id, "فرمان نامعتبر است.", MAIN_MENU)
+    return "ok", 200
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=80)
