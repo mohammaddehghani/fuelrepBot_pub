@@ -1,4 +1,5 @@
-flask
+Flask
 requests
 python-dotenv
-psycopg2-binary
+pandas
+matplotlib
