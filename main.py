@@ -1,4 +1,5 @@
 import os
+os.environ['MPLCONFIGDIR'] = '/tmp'
 import sqlite3
 import csv
 import io
