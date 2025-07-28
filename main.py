@@ -1,11 +1,11 @@
 import os
-os.environ['MPLCONFIGDIR'] = '/tmp'
-import sqlite3
 import csv
 import io
 import matplotlib.pyplot as plt
 import pandas as pd
-from flask import Flask, request, send_file
+import psycopg2
+from urllib.parse import urlparse
+from flask import Flask, request
 import requests
 from datetime import datetime
 
@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-DATABASE_PATH = os.getenv("DATABASE_PATH", "fuel_logs.db")
+DATABASE_URL = os.getenv("DATABASE_URL")
 ADMIN_CHAT_IDS = [int(x) for x in os.getenv("ADMIN_CHAT_IDS", "").split(",") if x.strip()]
 
 app = Flask(__name__)
@@ -23,6 +23,8 @@ user_steps = {}
 user_buffers = {}
 
 MAIN_MENU = [["ثبت سوختگیری ⛽️"], ["📦 بکاپ سوختگیری", "📊 نمودار مصرف"]]
+
+os.environ['MPLCONFIGDIR'] = '/tmp'
 
 def send_message(chat_id, text, buttons=None):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -37,11 +39,21 @@ def send_document(chat_id, file_bytes, filename, caption=""):
     data = {"chat_id": chat_id, "caption": caption}
     requests.post(url, data=data, files=files)
 
+def get_postgres_connection():
+    url = urlparse(DATABASE_URL)
+    return psycopg2.connect(
+        dbname=url.path[1:],
+        user=url.username,
+        password=url.password,
+        host=url.hostname,
+        port=url.port
+    )
+
 def init_db():
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = get_postgres_connection()
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS fuel_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         km REAL,
         liter REAL,
         timestamp TEXT
@@ -50,15 +62,15 @@ def init_db():
     conn.close()
 
 def insert_log(km, liter):
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = get_postgres_connection()
     c = conn.cursor()
-    c.execute("INSERT INTO fuel_logs (km, liter, timestamp) VALUES (?, ?, ?)",
+    c.execute("INSERT INTO fuel_logs (km, liter, timestamp) VALUES (%s, %s, %s)",
               (km, liter, datetime.now().isoformat()))
     conn.commit()
     conn.close()
 
 def generate_csv():
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = get_postgres_connection()
     df = pd.read_sql_query("SELECT * FROM fuel_logs", conn)
     conn.close()
     output = io.StringIO()
@@ -67,7 +79,7 @@ def generate_csv():
     return io.BytesIO(output.read().encode("utf-8"))
 
 def generate_chart():
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = get_postgres_connection()
     df = pd.read_sql_query("SELECT km AS Kilometer, liter AS Liter FROM fuel_logs ORDER BY id", conn)
     conn.close()
 
