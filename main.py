@@ -84,7 +84,7 @@ def generate_chart():
     reliable_df['ma_large'] = reliable_df['fuel_per_100km'].rolling(window=15).mean()
     avg = reliable_df['fuel_per_100km'].mean()
     reliable_df['is_last'] = False
-    reliable_df.iloc[-5:, reliable_df.columns.get_loc('is_last')] = True
+    reliable_df.loc[reliable_df.tail(5).index, 'is_last'] = True
     marker_sizes = reliable_df['Liter'] * 7
 
     plt.figure(figsize=(13, 7))
@@ -148,9 +148,7 @@ def webhook():
         try:
             liter = float(text)
             buffer['liter'] = liter
-            summary = f"✅ اطلاعات:
-            کیلومتر: {buffer['km']}
-            لیتر: {buffer['liter']}"
+            summary = f"✅ اطلاعات:\nکیلومتر: {buffer['km']}\nلیتر: {buffer['liter']}"
             user_steps[chat_id] = "awaiting_confirmation"
             send_message(chat_id, summary + "\nآیا تأیید می‌کنی؟", [["✅ بله", "❌ خیر"]])
         except:
