@@ -97,43 +97,42 @@ def generate_csv():
 
 def generate_chart():
     conn = get_connection()
-    df = pd.read_sql('SELECT km AS Kilometer, liter AS Liter FROM fuel_logs ORDER BY id', conn)
+    # دریافت داده‌ها: km و liter
+    df = pd.read_sql('SELECT km, liter FROM fuel_logs ORDER BY id', conn)
     conn.close()
     if len(df) < 5:
         return None
+    # تنظیم نام ستون‌ها
+    df.rename(columns={'km': 'Kilometer', 'liter': 'Liter'}, inplace=True)
+    # محاسبات
     df['distance'] = df['Kilometer'].diff()
     df['fuel_per_100km'] = (df['Liter'] / df['distance']) * 100
-    df.dropna(inplace=True)
+    df = df.dropna().copy()
     df['is_reliable'] = df['Liter'] >= 12
+
     reliable = df[df['is_reliable']].copy()
-    noisy = df[~df['is_reliable']]
-    reliable['ma_small'] = reliable['fuel_per_100km'].rolling(5).mean()
-    reliable['ma_large'] = reliable['fuel_per_100km'].rolling(15).mean()
+    noisy = df[~df['is_reliable']].copy()
+    reliable['ma_small'] = reliable['fuel_per_100km'].rolling(window=5).mean()
+    reliable['ma_large'] = reliable['fuel_per_100km'].rolling(window=15).mean()
     avg = reliable['fuel_per_100km'].mean()
     reliable['is_last'] = False
     reliable.loc[reliable.tail(5).index, 'is_last'] = True
 
+    # رسم نمودار
     plt.figure(figsize=(12, 6))
     sc = plt.scatter(
-        reliable['Kilometer'],
-        reliable['fuel_per_100km'],
-        s=reliable['Liter'] * 7,
-        c=reliable['Liter'],
-        cmap='Blues',
-        alpha=0.8
+        reliable['Kilometer'], reliable['fuel_per_100km'],
+        s=reliable['Liter'] * 7, c=reliable['Liter'], cmap='Blues', alpha=0.8
     )
     if not noisy.empty:
         plt.scatter(
-            noisy['Kilometer'],
-            noisy['fuel_per_100km'],
-            s=noisy['Liter'] * 7,
-            c='red',
-            marker='x',
-            alpha=0.6
+            noisy['Kilometer'], noisy['fuel_per_100km'],
+            s=noisy['Liter'] * 7, c='red', marker='x', alpha=0.6
         )
     plt.plot(reliable['Kilometer'], reliable['ma_small'], label='MA 5')
     plt.plot(reliable['Kilometer'], reliable['ma_large'], label='MA 15')
     plt.axhline(avg, linestyle='--', label=f'Average: {avg:.1f}')
+    # شماره‌گذاری 5 نقطه آخر
     for i, (_, row) in enumerate(reliable[reliable['is_last']].iterrows(), start=1):
         plt.text(row['Kilometer'], row['fuel_per_100km'], str(i), ha='center')
     plt.colorbar(sc, label='Volume Refueled [Liters]')
