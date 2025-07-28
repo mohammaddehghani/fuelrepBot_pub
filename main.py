@@ -149,8 +149,8 @@ def webhook():
             liter = float(text)
             buffer['liter'] = liter
             summary = f"✅ اطلاعات:
-کیلومتر: {buffer['km']}
-لیتر: {buffer['liter']}"
+            کیلومتر: {buffer['km']}
+            لیتر: {buffer['liter']}"
             user_steps[chat_id] = "awaiting_confirmation"
             send_message(chat_id, summary + "\nآیا تأیید می‌کنی؟", [["✅ بله", "❌ خیر"]])
         except:
